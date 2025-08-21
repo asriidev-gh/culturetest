@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Trash2, ArrowLeft, Tag } from 'lucide-react'
+import { Plus, Trash2, ArrowLeft, Tag, Sparkles, Loader2 } from 'lucide-react'
 
 const TestQuestions = ({ testData, updateTestData, onPrev, onNext }) => {
   const [questions, setQuestions] = useState(testData.questions.length > 0 ? testData.questions : [
@@ -17,6 +17,10 @@ const TestQuestions = ({ testData, updateTestData, onPrev, onNext }) => {
       ]
     }
   ])
+  
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [questionCount, setQuestionCount] = useState(10)
+  const [showGenerateModal, setShowGenerateModal] = useState(false)
 
   const addQuestion = () => {
     const newQuestion = {
@@ -76,6 +80,66 @@ const TestQuestions = ({ testData, updateTestData, onPrev, onNext }) => {
       }
       return q
     }))
+  }
+
+  const generateQuestionsWithAI = async () => {
+    if (!testData.name || !testData.behaviors) {
+      alert('Please complete the test name and behaviors first')
+      return
+    }
+
+    console.log(`🔄 Starting AI generation for ${questionCount} questions...`)
+    console.log(`📝 Test: ${testData.name}`)
+    console.log(`🎯 Behaviors: ${testData.behaviors}`)
+    
+    setIsGenerating(true)
+    try {
+      const response = await fetch('/api/generate-questions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          testName: testData.name,
+          behaviors: testData.behaviors,
+          questionCount: questionCount
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to generate questions')
+      }
+
+      const data = await response.json()
+      console.log('📊 AI Response:', data)
+      
+      if (data.success && data.questions) {
+        // Replace existing questions with AI-generated ones
+        setQuestions(data.questions)
+        setShowGenerateModal(false)
+        
+        // Show detailed feedback
+        const actualCount = data.questions.length
+        const expectedCount = questionCount
+        
+        console.log(`📈 Generated ${actualCount}/${expectedCount} questions`)
+        
+        if (actualCount === expectedCount) {
+          alert(`✅ Successfully generated exactly ${actualCount} questions!`)
+        } else if (actualCount > expectedCount) {
+          alert(`✅ Generated ${actualCount} questions (more than requested ${expectedCount})`)
+        } else {
+          alert(`⚠️ Generated ${actualCount} questions (requested ${expectedCount}). Some questions may be generic.`)
+        }
+      } else {
+        throw new Error(data.error || 'Failed to generate questions')
+      }
+    } catch (error) {
+      console.error('❌ Error generating questions:', error)
+      alert(`Error generating questions: ${error.message}`)
+    } finally {
+      setIsGenerating(false)
+    }
   }
 
   const handleFinish = () => {
@@ -208,14 +272,35 @@ const TestQuestions = ({ testData, updateTestData, onPrev, onNext }) => {
           </div>
         ))}
 
-        <div className="text-center">
-          <button
-            onClick={addQuestion}
-            className="btn-secondary flex items-center space-x-2 mx-auto"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Add Another Question</span>
-          </button>
+        <div className="text-center space-y-4">
+          {/* AI Generate Questions Button */}
+          <div className="flex items-center justify-center space-x-4">
+            <button
+              onClick={() => setShowGenerateModal(true)}
+              disabled={!testData.name || !testData.behaviors}
+              className="btn-primary flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Sparkles className="h-4 w-4" />
+              <span>Generate Questions with AI</span>
+            </button>
+          </div>
+
+          <div className="text-sm text-gray-500">
+            {!testData.name || !testData.behaviors ? 
+              'Complete test name and behaviors first to use AI generation' : 
+              'AI will generate relevant questions based on your test description'
+            }
+          </div>
+
+          <div className="border-t border-gray-200 pt-4">
+            <button
+              onClick={addQuestion}
+              className="btn-secondary flex items-center space-x-2 mx-auto"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Add Another Question</span>
+            </button>
+          </div>
         </div>
 
         <div className="flex justify-between pt-6">
@@ -236,6 +321,75 @@ const TestQuestions = ({ testData, updateTestData, onPrev, onNext }) => {
           </button>
         </div>
       </div>
+
+      {/* AI Generation Modal */}
+      {showGenerateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Generate Questions with AI
+            </h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Number of Questions
+                </label>
+                <input
+                  type="number"
+                  value={questionCount}
+                  onChange={(e) => setQuestionCount(Math.max(10, parseInt(e.target.value) || 10))}
+                  className="input-field w-full"
+                  min="10"
+                  max="50"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Minimum: 10, Maximum: 50
+                </p>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-sm text-blue-700">
+                  <strong>AI will generate questions based on:</strong>
+                </p>
+                <p className="text-sm text-blue-600 mt-1">
+                  <strong>Test Name:</strong> {testData.name}
+                </p>
+                <p className="text-sm text-blue-600">
+                  <strong>Behaviors:</strong> {testData.behaviors}
+                </p>
+              </div>
+
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowGenerateModal(false)}
+                  className="btn-secondary flex-1"
+                  disabled={isGenerating}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={generateQuestionsWithAI}
+                  disabled={isGenerating}
+                  className="btn-primary flex items-center justify-center flex-1"
+                >
+                  {isGenerating ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Generate Questions
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
