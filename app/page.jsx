@@ -5,6 +5,7 @@ import Header from '../components/Header'
 import TestCreation from '../components/TestCreation'
 import TestQuestions from '../components/TestQuestions'
 import TestShare from '../components/TestShare'
+import TestResults from '../components/TestResults'
 
 export default function Home() {
   const [testData, setTestData] = useState({
@@ -24,6 +25,15 @@ export default function Home() {
 
   const prevStep = () => {
     setTestData(prev => ({ ...prev, currentStep: prev.currentStep - 1 }))
+  }
+
+  const resetTest = () => {
+    setTestData({
+      name: '',
+      behaviors: '',
+      questions: [],
+      currentStep: 1
+    })
   }
 
   const renderCurrentStep = () => {
@@ -50,6 +60,15 @@ export default function Home() {
           <TestShare 
             testData={testData}
             onPrev={prevStep}
+            onNext={nextStep}
+          />
+        )
+      case 4:
+        return (
+          <TestResults 
+            testData={testData}
+            onPrev={prevStep}
+            onReset={resetTest}
           />
         )
       default:

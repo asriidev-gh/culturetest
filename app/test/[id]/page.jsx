@@ -16,55 +16,78 @@ export default function TestPage({ params }) {
   const [isPreviewMode, setIsPreviewMode] = useState(false)
 
   useEffect(() => {
-    try {
-      // First try to fetch test data from context
-      let test = getTestById(params.id)
-      
-      // If not found in context, check localStorage for preview data
-      if (!test) {
-        const previewData = localStorage.getItem('previewTestData')
-        if (previewData) {
-          try {
-            const parsedData = JSON.parse(previewData)
-            // Only use preview data if the ID matches
-            if (parsedData.id === params.id) {
-              test = parsedData
-              console.log('Using preview test data:', test)
+    // Only run once when component mounts
+    const loadTestData = () => {
+      try {
+        // First try to fetch test data from context
+        let test = getTestById(params.id)
+        
+        // If not found in context, check localStorage for preview data
+        if (!test) {
+          const previewData = localStorage.getItem('previewTestData')
+          if (previewData) {
+            try {
+              const parsedData = JSON.parse(previewData)
+              // Only use preview data if the ID matches
+              if (parsedData.id === params.id) {
+                test = parsedData
+                console.log('Using preview test data:', test)
+              }
+            } catch (error) {
+              console.error('Error parsing preview test data:', error)
             }
-          } catch (error) {
-            console.error('Error parsing preview test data:', error)
           }
         }
-      }
-      
-      if (test) {
-        setTestData(test)
-        // Check if this is preview mode
-        if (!test.createdAt) {
-          setIsPreviewMode(true)
-        } else {
-          // Only record test start if it's a real test, not a preview
-          try {
-            recordTestStart(params.id)
-            setHasStarted(true)
-          } catch (error) {
-            console.error('Error recording test start:', error)
+        
+        if (test) {
+          // Validate test structure before setting
+          if (test.questions && Array.isArray(test.questions)) {
+            // Ensure all questions have options
+            const validQuestions = test.questions.filter(q => q.options && Array.isArray(q.options) && q.options.length > 0)
+            
+            if (validQuestions.length !== test.questions.length) {
+              console.warn('Some questions are missing options, filtering them out')
+            }
+            
+            // Set test data with validated questions
+            setTestData({
+              ...test,
+              questions: validQuestions
+            })
+          } else {
+            setTestData(test)
+          }
+          
+          // Check if this is preview mode
+          if (!test.createdAt) {
+            setIsPreviewMode(true)
+          } else {
+            // Only record test start if it's a real test, not a preview
+            try {
+              recordTestStart(params.id)
+              setHasStarted(true)
+            } catch (error) {
+              console.error('Error recording test start:', error)
+            }
           }
         }
+      } catch (error) {
+        console.error('Error in test page useEffect:', error)
+        // Show user-friendly error message
+        alert('There was an error loading the test. Please refresh the page.')
       }
-      
-      // Start timer
-      const timer = setInterval(() => {
-        setTimeSpent(prev => prev + 1)
-      }, 1000)
-
-      return () => clearInterval(timer)
-    } catch (error) {
-      console.error('Error in test page useEffect:', error)
-      // Show user-friendly error message
-      alert('There was an error loading the test. Please refresh the page.')
     }
-  }, [params.id, getTestById, recordTestStart])
+
+    // Load test data once
+    loadTestData()
+    
+    // Start timer
+    const timer = setInterval(() => {
+      setTimeSpent(prev => prev + 1)
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, []) // Empty dependency array - only run once
 
   const handleAnswer = (questionId, score) => {
     setAnswers(prev => ({
@@ -94,6 +117,12 @@ export default function TestPage({ params }) {
         console.error('Missing required data for test completion')
         return
       }
+      
+      // Additional validation for question structure
+      if (!testData.questions.every(q => q.options && q.options.length > 0)) {
+        console.error('Some questions are missing options')
+        return
+      }
 
       // Calculate results with dynamic scoring system
       const totalScore = Object.values(answers).reduce((sum, score) => sum + score, 0)
@@ -103,17 +132,19 @@ export default function TestPage({ params }) {
       let maxPossibleScore = 0
       
       testData.questions.forEach(question => {
-        const questionScores = question.options.map(opt => opt.score)
-        minPossibleScore += Math.min(...questionScores)
-        maxPossibleScore += Math.max(...questionScores)
+        if (question.options && question.options.length > 0) {
+          const questionScores = question.options.map(opt => opt.score)
+          minPossibleScore += Math.min(...questionScores)
+          maxPossibleScore += Math.max(...questionScores)
+        }
       })
       
       const scoreRange = maxPossibleScore - minPossibleScore
       const percentage = scoreRange > 0 ? Math.round(((totalScore - minPossibleScore) / scoreRange) * 100) : 0
       
       // Calculate average score per question as a percentage
-      const maxScorePerQuestion = Math.max(...testData.questions.flatMap(q => q.options.map(opt => opt.score)))
-      const averageScorePercentage = Math.round((totalScore / testData.questions.length) / maxScorePerQuestion * 100)
+      const maxScorePerQuestion = Math.max(...testData.questions.flatMap(q => q.options?.map(opt => opt.score) || []))
+      const averageScorePercentage = maxScorePerQuestion > 0 ? Math.round((totalScore / testData.questions.length) / maxScorePerQuestion * 100) : 0
       
       console.log('Score calculation:', {
         totalScore,
@@ -133,7 +164,7 @@ export default function TestPage({ params }) {
         if (!categoryScores[q.tag]) {
           categoryScores[q.tag] = { total: 0, count: 0, minPossible: 0, maxPossible: 0 }
         }
-        if (answers[q.id] !== undefined) {
+        if (answers[q.id] !== undefined && q.options && q.options.length > 0) {
           categoryScores[q.tag].total += answers[q.id]
           categoryScores[q.tag].count += 1
           categoryScores[q.tag].minPossible += Math.min(...q.options.map(opt => opt.score))
@@ -356,6 +387,7 @@ export default function TestPage({ params }) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="p-4 bg-green-50 rounded-lg border border-green-200">
                 <h4 className="font-medium text-green-800 mb-2">Your Strengths</h4>
+                {console.log('categories:',results.categories)}
                 <p className="text-sm text-green-700">
                   {results.categories.filter(c => c.percentage >= 70).map(c => c.name).join(', ')} are areas where you excel.
                 </p>

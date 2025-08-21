@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Copy, Mail, Share2, ArrowLeft, Eye, Play, CheckCircle, TrendingUp, Plus } from 'lucide-react'
 import { useTestContext } from '../contexts/TestContext'
 
-const TestShare = ({ testData, onPrev }) => {
+const TestShare = ({ testData, onPrev, onNext }) => {
   const [copied, setCopied] = useState(false)
   const { createTest, getTestAnalytics } = useTestContext()
   const [testId, setTestId] = useState(null)
@@ -282,11 +282,11 @@ const TestShare = ({ testData, onPrev }) => {
           </button>
 
           <button
-            onClick={createNewTest}
+            onClick={onNext}
             className="btn-primary flex items-center space-x-2"
           >
-            <Plus className="h-4 w-4" />
-            <span>Create New Test</span>
+            <TrendingUp className="h-4 w-4" />
+            <span>View Results</span>
           </button>
         </div>
       </div>
