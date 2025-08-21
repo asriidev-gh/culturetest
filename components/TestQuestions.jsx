@@ -143,10 +143,25 @@ const TestQuestions = ({ testData, updateTestData, onPrev, onNext }) => {
   }
 
   const handleFinish = () => {
-    if (questions.length > 0 && questions.every(q => q.tag && q.question)) {
-      updateTestData({ questions })
-      // Move to next step (TestShare)
-      onNext()
+    if (questions.length > 0) {
+      // Filter out incomplete questions and keep only valid ones
+      const validQuestions = questions.filter(q => q.tag && q.question)
+      
+      if (validQuestions.length > 0) {
+        // Update with only valid questions
+        updateTestData({ questions: validQuestions })
+        
+        // Show feedback about filtered questions
+        if (validQuestions.length < questions.length) {
+          const removedCount = questions.length - validQuestions.length
+          alert(`✅ Proceeding with ${validQuestions.length} valid questions. ${removedCount} incomplete question${removedCount > 1 ? 's' : ''} were removed.`)
+        }
+        
+        // Move to next step (TestShare)
+        onNext()
+      } else {
+        alert('Please add at least one complete question with both tag and question text.')
+      }
     }
   }
 
@@ -273,6 +288,18 @@ const TestQuestions = ({ testData, updateTestData, onPrev, onNext }) => {
         ))}
 
         <div className="text-center space-y-4">
+          {/* Question Status Indicator */}
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+            <div className="text-sm text-gray-700">
+              <span className="font-medium">Question Status:</span> {questions.filter(q => q.tag && q.question).length} complete / {questions.length} total
+            </div>
+            {questions.length > 0 && questions.filter(q => q.tag && q.question).length < questions.length && (
+              <div className="text-xs text-orange-600 mt-1">
+                ⚠️ Some questions are incomplete. Fill in tag and question text to proceed.
+              </div>
+            )}
+          </div>
+
           {/* AI Generate Questions Button */}
           <div className="flex items-center justify-center space-x-4">
             <button
@@ -300,6 +327,9 @@ const TestQuestions = ({ testData, updateTestData, onPrev, onNext }) => {
               <Plus className="h-4 w-4" />
               <span>Add Another Question</span>
             </button>
+            <p className="text-xs text-gray-500 mt-2">
+              💡 You can add questions manually after AI generation or edit existing ones
+            </p>
           </div>
         </div>
 
@@ -314,7 +344,7 @@ const TestQuestions = ({ testData, updateTestData, onPrev, onNext }) => {
 
           <button
             onClick={handleFinish}
-            disabled={questions.length === 0 || !questions.every(q => q.tag && q.question)}
+            disabled={questions.length === 0 || !questions.some(q => q.tag && q.question)}
             className="btn-primary flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span>Continue to Share</span>
