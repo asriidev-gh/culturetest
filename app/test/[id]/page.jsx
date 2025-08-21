@@ -111,6 +111,10 @@ export default function TestPage({ params }) {
       const scoreRange = maxPossibleScore - minPossibleScore
       const percentage = scoreRange > 0 ? Math.round(((totalScore - minPossibleScore) / scoreRange) * 100) : 0
       
+      // Calculate average score per question as a percentage
+      const maxScorePerQuestion = Math.max(...testData.questions.flatMap(q => q.options.map(opt => opt.score)))
+      const averageScorePercentage = Math.round((totalScore / testData.questions.length) / maxScorePerQuestion * 100)
+      
       console.log('Score calculation:', {
         totalScore,
         minPossibleScore,
@@ -119,7 +123,8 @@ export default function TestPage({ params }) {
         percentage,
         answers,
         questionCount: testData.questions.length,
-        averageScore: Math.round(totalScore / testData.questions.length)
+        averageScore: Math.round(totalScore / testData.questions.length),
+        averageScorePercentage
       })
       
       // Calculate category scores
@@ -162,6 +167,7 @@ export default function TestPage({ params }) {
       setResults({
         score: totalScore,
         percentage: percentage,
+        averageScorePercentage: averageScorePercentage,
         rank: rank,
         categories: Object.keys(categoryPercentages).map(tag => ({
           name: tag,
@@ -243,7 +249,7 @@ export default function TestPage({ params }) {
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Your Performance</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="text-center p-6 bg-blue-50 rounded-lg">
-                <div className="text-3xl font-bold text-blue-600 mb-2">{Math.round(results.score / testData.questions.length)}%</div>
+                <div className="text-3xl font-bold text-blue-600 mb-2">{results.averageScorePercentage}%</div>
                 <div className="text-sm text-blue-600 font-medium">Average Score</div>
                 <div className="text-xs text-gray-500">Per Question</div>
               </div>
